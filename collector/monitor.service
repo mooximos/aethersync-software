@@ -1,0 +1,20 @@
+# Template: collector/install.sh fills in @USER@ and @REPO@ and installs it as
+# /etc/systemd/system/intersection-monitor.service
+[Unit]
+Description=Intersection Monitor collector (measures only; never controls the traffic light)
+After=network.target time-sync.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@REPO@
+Environment=PYTHONPATH=@REPO@:@REPO@/collector
+Environment=PYTHONUNBUFFERED=1
+ExecStart=@REPO@/.venv/bin/python -m monitor --site @REPO@/collector/site.json --data @REPO@/data
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
