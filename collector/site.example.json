@@ -1,0 +1,253 @@
+{
+  "site_name": "REPLACE: name of the intersection",
+  "latitude": 0.0,
+  "longitude": 0.0,
+  "time_zone": "America/Los_Angeles",
+  "researchers": [
+    "REPLACE: student name",
+    "REPLACE: student name"
+  ],
+  "software_version": "1.0.0",
+  "privacy": "no images or video are stored",
+  "device": {
+    "computer": "Raspberry Pi 5 (2 GB)",
+    "ai_chip": "Hailo-8L (AI HAT+ 13 TOPS)",
+    "mount_height_m": 5.8
+  },
+  "cameras": {
+    "A": {
+      "approach": "N",
+      "usb_path": "/dev/v4l/by-path/REPLACE-camera-A-top-USB-3-see-check_hardware",
+      "lanes": {
+        "1": {
+          "movements": [
+            "R",
+            "T"
+          ]
+        },
+        "2": {
+          "movements": [
+            "T"
+          ]
+        },
+        "3": {
+          "movements": [
+            "L"
+          ]
+        }
+      },
+      "lane_x_m": {
+        "1": [
+          0.0,
+          3.5
+        ],
+        "2": [
+          3.5,
+          7.0
+        ],
+        "3": [
+          7.0,
+          10.5
+        ]
+      },
+      "homography": null,
+      "calib_points": [],
+      "tiles": [],
+      "stop_line_zone_m": 6.0,
+      "view_length_m": 60.0
+    },
+    "B": {
+      "approach": "E",
+      "usb_path": "/dev/v4l/by-path/REPLACE-camera-B-bottom-USB-3-see-check_hardware",
+      "lanes": {
+        "1": {
+          "movements": [
+            "R",
+            "T"
+          ]
+        },
+        "2": {
+          "movements": [
+            "T"
+          ]
+        },
+        "3": {
+          "movements": [
+            "L"
+          ]
+        }
+      },
+      "lane_x_m": {
+        "1": [
+          0.0,
+          3.5
+        ],
+        "2": [
+          3.5,
+          7.0
+        ],
+        "3": [
+          7.0,
+          10.5
+        ]
+      },
+      "homography": null,
+      "calib_points": [],
+      "tiles": [],
+      "stop_line_zone_m": 6.0,
+      "view_length_m": 60.0
+    },
+    "C": {
+      "approach": "S",
+      "usb_path": "/dev/v4l/by-path/REPLACE-camera-C-top-USB-2-see-check_hardware",
+      "lanes": {
+        "1": {
+          "movements": [
+            "R",
+            "T"
+          ]
+        },
+        "2": {
+          "movements": [
+            "T"
+          ]
+        },
+        "3": {
+          "movements": [
+            "L"
+          ]
+        }
+      },
+      "lane_x_m": {
+        "1": [
+          0.0,
+          3.5
+        ],
+        "2": [
+          3.5,
+          7.0
+        ],
+        "3": [
+          7.0,
+          10.5
+        ]
+      },
+      "homography": null,
+      "calib_points": [],
+      "tiles": [],
+      "stop_line_zone_m": 6.0,
+      "view_length_m": 60.0
+    },
+    "D": {
+      "approach": "W",
+      "usb_path": "/dev/v4l/by-path/REPLACE-camera-D-bottom-USB-2-see-check_hardware",
+      "lanes": {
+        "1": {
+          "movements": [
+            "R",
+            "T"
+          ]
+        },
+        "2": {
+          "movements": [
+            "T"
+          ]
+        },
+        "3": {
+          "movements": [
+            "L"
+          ]
+        }
+      },
+      "lane_x_m": {
+        "1": [
+          0.0,
+          3.5
+        ],
+        "2": [
+          3.5,
+          7.0
+        ],
+        "3": [
+          7.0,
+          10.5
+        ]
+      },
+      "homography": null,
+      "calib_points": [],
+      "tiles": [],
+      "stop_line_zone_m": 6.0,
+      "view_length_m": 60.0
+    }
+  },
+  "coordinates": {
+    "x_m": "meters from the curbside edge of the approach toward the center line",
+    "y_m": "meters upstream of the stop line; 0 = stop line, negative = past it"
+  },
+  "detection": {
+    "model": "yolov8s",
+    "hef_path": "/usr/share/hailo-models/yolov8s_h8l.hef",
+    "input_px": 640,
+    "frames_per_second": 10,
+    "min_confidence": 0.35,
+    "low_conf_flag_below": 0.65,
+    "classes": [
+      "car",
+      "motorcycle",
+      "bus",
+      "truck"
+    ]
+  },
+  "stopped_speed_mps": 0.5,
+  "moving_speed_mps": 1.0,
+  "reaction_time_s": 1.5,
+  "track_sample_rate_hz": 2,
+  "schedule": {
+    "windows": [
+      {
+        "days": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri"
+        ],
+        "start": "06:30",
+        "end": "09:30"
+      },
+      {
+        "days": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri"
+        ],
+        "start": "15:30",
+        "end": "18:30"
+      }
+    ],
+    "boot_grace_min": 15,
+    "wake_early_min": 10
+  },
+  "power": {
+    "shutdown_below_v": 12.0,
+    "shutdown_after_s": 60
+  },
+  "night": {
+    "switch_sun_elevation_deg": -2,
+    "night_exposure": 40,
+    "night_gain": null
+  },
+  "event_codes": {
+    "82": "detector_on",
+    "81": "detector_off",
+    "1": "green_start_inferred",
+    "10": "red_inferred_by"
+  },
+  "clock": {
+    "last_sync": null,
+    "offset_found_s": null
+  },
+  "web_password": null
+}

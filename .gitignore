@@ -7,3 +7,6 @@ venv/
 /data/
 /data_test/
 /results/
+
+# the real settings file on the Pi (may hold the web password); site.example.json is the template
+/collector/site.json

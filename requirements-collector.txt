@@ -1,5 +1,13 @@
-# Raspberry Pi: installed by collector/install.sh into a venv made with
-# --system-site-packages, so numpy, OpenCV, picamera2 and the Hailo bindings
-# come from Raspberry Pi OS (apt) and must NOT be pinned or reinstalled here.
-# Stage 2 adds supervision, smbus2, astral and flask.
+# Collector packages.
+#
+# On the Raspberry Pi, collector/install.sh makes a venv with --system-site-packages
+# and installs this file. numpy, OpenCV (python3-opencv), scipy, matplotlib,
+# picamera2 and the Hailo bindings come from Raspberry Pi OS (apt), not from pip.
+#
+# On a laptop (for --replay with a phone video), also install:
+#   pip install opencv-python-headless==5.0.0.93 ultralytics==8.4.215
+supervision==0.30.9   # the last version that still includes ByteTrack
+smbus2==0.6.1
+astral==3.2
+flask==3.1.3
 pydantic==2.13.5
