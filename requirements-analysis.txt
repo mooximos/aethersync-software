@@ -1,0 +1,6 @@
+# Laptop (Windows 11, Python 3.11+):  pip install -r requirements-analysis.txt
+# Stage 1 (shared code, sample data generator, tests). Stage 3 adds
+# pandas, scipy, matplotlib, pyyaml, eclipse-sumo, traci and sumolib.
+numpy==2.5.3
+pydantic==2.13.5
+pytest==9.2.0

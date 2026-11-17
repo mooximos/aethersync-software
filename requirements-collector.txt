@@ -1,0 +1,5 @@
+# Raspberry Pi: installed by collector/install.sh into a venv made with
+# --system-site-packages, so numpy, OpenCV, picamera2 and the Hailo bindings
+# come from Raspberry Pi OS (apt) and must NOT be pinned or reinstalled here.
+# Stage 2 adds supervision, smbus2, astral and flask.
+pydantic==2.13.5
