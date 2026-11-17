@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intersection-monitor"
+version = "1.0.0"
+description = "Measures one signalized intersection (Raspberry Pi) and recommends better signal timing (laptop)."
+requires-python = ">=3.11"
+
+[tool.setuptools]
+packages = ["common", "monitor", "tlopt"]
+
+[tool.setuptools.package-dir]
+common = "common"
+monitor = "collector/monitor"
+tlopt = "analysis/tlopt"
+
+[tool.pytest.ini_options]
+# Lets the tests import common, monitor, tlopt and the tools without installing anything.
+pythonpath = [".", "collector", "analysis", "tools"]
+testpaths = ["common/tests", "tools/tests", "collector/tests", "analysis/tests"]
+addopts = "--import-mode=importlib -q"
