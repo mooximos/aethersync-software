@@ -55,10 +55,9 @@ Sample data generator:
 
 ## Open questions for the project owners (asked at the end of stage 1)
 
-1. **Right turn on red.** A car that stops at the line and then turns right on red looks exactly
-   like "the first queued car moved", which would create false `green_start_inferred` events.
-   Proposal for stage 2: ignore vehicles in lanes that allow a right turn when inferring green,
-   unless the approach has no other lane. This changes the method, so it needs a yes/no.
+1. **Right turn on red - DECIDED (yes).** A car that stops and then turns right on red looks like
+   "the first queued car moved". Stage 2 rule: when inferring green, ignore every lane that allows
+   a right turn (right-only or shared), unless the approach has no other lane.
 2. **Darkness in the evening window.** With `daylight_only: true`, data after about 17:00 PST in
    November-January is excluded (sunset is before 17:00). The evening plan would then rest on
    15:30 to about 16:45 only.
