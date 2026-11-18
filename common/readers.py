@@ -30,8 +30,8 @@ def open_text(path: Path) -> io.TextIOBase:
     """Open a data file for reading as text, whether or not it is gzipped."""
     path = Path(path)
     if path.suffix == ".gz":
-        return gzip.open(path, "rt", encoding="utf-8", newline="")
-    return open(path, "r", encoding="utf-8", newline="")
+        return gzip.open(path, "rt", encoding="utf-8-sig", newline="")
+    return open(path, "r", encoding="utf-8-sig", newline="")
 
 
 def read_header_and_rows(path: Path) -> tuple[list[str], list[dict]]:

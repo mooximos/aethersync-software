@@ -65,6 +65,14 @@ class Period:
     model_check: dict = field(default_factory=dict)
     plans: dict[str, optimize.Plan] = field(default_factory=dict)
     problem: optimize.Problem | None = None
+    missing: set = field(default_factory=set)      # (day, approach) pairs whose camera did not cover the period
+
+
+def _drop_missing(rows: pd.DataFrame, missing: set) -> pd.DataFrame:
+    if not missing or not len(rows):
+        return rows
+    pairs = pd.Series(list(zip(rows["day"], rows["approach"])), index=rows.index)
+    return rows[~pairs.isin(missing)]
 
 
 def measure(ds: Dataset, inter: Intersection, name: str) -> Period:
@@ -80,6 +88,15 @@ def measure(ds: Dataset, inter: Intersection, name: str) -> Period:
     p = Period(name)
     groups = measures.lane_groups(inter)
     t = p.tables
+    t["coverage"] = quality.coverage(ds, inter, name)
+    cov = t["coverage"]
+    p.missing = set(zip(cov.loc[~cov["used"], "day"], cov.loc[~cov["used"], "approach"]))
+    never = [a for a in inter.approaches if not cov[(cov["approach"] == a) & cov["used"]].shape[0]]
+    if never:
+        raise ValueError(f"no day where the camera for approach {', '.join(never)} recorded the whole period "
+                         f"{name} ({inter.periods[name]}); see the coverage table")
+    served, arriving = _drop_missing(served, p.missing), _drop_missing(arriving, p.missing)
+    signals = _drop_missing(signals, p.missing)
     t["counts_served"] = measures.demand(served, zone, "served")
     t["counts_arriving"] = measures.demand(arriving, zone, "arriving")
     t["flows"] = measures.flow_summary(t["counts_arriving"], (end - start) / 60)
@@ -100,20 +117,21 @@ def measure(ds: Dataset, inter: Intersection, name: str) -> Period:
     t["arrivals"] = measures.arrival_pattern(arriving, signals, greens, cycles, groups)
     yellow, all_red, min_green, _why = optimize.safety(inter)
     p.current = timing.current_plan(inter, p.timing, {q: (yellow[q], all_red[q]) for q in yellow})
-    p.groups = _group_inputs(arriving, zone, inter, groups, sat, t["arrivals"], ds.used_days)
+    p.groups = _group_inputs(arriving, zone, inter, groups, sat, t["arrivals"], ds.used_days, p.missing)
     return p
 
 
 def _group_inputs(arriving: pd.DataFrame, zone: str, inter: Intersection, groups, sat: pd.DataFrame,
-                  arrivals: pd.DataFrame, days: list[str]) -> list[hcm.GroupInput]:
-    """Design flow = the lane group's arrivals in the day's busiest 15 minutes x 4 (mean over days)."""
+                  arrivals: pd.DataFrame, days: list[str], missing: set = frozenset()) -> list[hcm.GroupInput]:
+    """Design flow = the lane group's arrivals in the day's busiest 15 minutes x 4 (mean over the days
+    whose camera for that approach covered the whole period)."""
     a = arriving.assign(interval=local_times(arriving["t_entered_s"], zone).dt.floor("15min"))
     totals = a.groupby(["day", "interval"]).size()
     out = []
     for g in groups:
         flows = []
         for day in days:
-            if day not in totals.index.get_level_values(0):
+            if day not in totals.index.get_level_values(0) or (day, g.approach) in missing:
                 continue
             peak = totals[day].idxmax()
             flows.append(4 * int(((a["day"] == day) & (a["interval"] == peak) & (a["approach"] == g.approach)
@@ -130,7 +148,8 @@ def _group_inputs(arriving: pd.DataFrame, zone: str, inter: Intersection, groups
 def model(p: Period, ds: Dataset, inter: Intersection) -> None:
     """Model check against measured delays, then the current, Webster and optimized plans."""
     v = ds.vehicles
-    arriving = v[measures.period_mask(v["t_entered_s"], ds.zone, inter, p.name) & ~v["excluded"]]
+    arriving = _drop_missing(v[measures.period_mask(v["t_entered_s"], ds.zone, inter, p.name) & ~v["excluded"]],
+                             p.missing)
     current_greens = {q: spec[0] for q, spec in p.current["phases"].items()}
     table = validate.intervals(arriving, ds.zone, p.groups, current_greens, p.current["cycle_s"])
     p.tables["model_check"] = table
@@ -175,7 +194,7 @@ def time_of_day(periods: dict[str, Period]) -> dict:
     """Separate plans if two periods' optimized plans differ by > 10 s of cycle or > 10% of any split."""
     names = list(periods)
     if len(names) < 2:
-        return {"separate": True, "reason": "only one period was studied"}
+        return {"separate": False, "reason": "only one period was studied, so there is one plan"}
     reasons = []
     for i, a in enumerate(names):
         for b in names[i + 1:]:

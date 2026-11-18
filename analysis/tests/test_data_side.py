@@ -185,3 +185,65 @@ def test_a_day_in_two_places_is_used_once(tmp_path):
     ds = load([SAMPLE, tmp_path / "copy"], with_tracks=False)
     assert ds.vehicles["key"].is_unique and ds.days == ["2026-05-12", "2026-05-13"]
     assert any("is in two places" in p for p in ds.problems)
+
+
+def _unplug_camera(day_dir, camera: str, hour: int) -> None:
+    """Make one hour look as if a camera was unplugged: its rows gone, its frame rate 0."""
+    import csv
+    import gzip
+    import io
+    for name in (f"vehicles_{hour:02d}.csv", f"tracks_{hour:02d}.csv.gz", f"signal_events_{hour:02d}.csv"):
+        path = day_dir / name
+        opener = gzip.open if name.endswith(".gz") else open
+        with opener(path, "rt", encoding="utf-8", newline="") as f:
+            rows = list(csv.reader(f))
+        id_col = rows[0].index("vehicle_id") if "vehicle_id" in rows[0] else rows[0].index("detail")
+        keep = [rows[0]] + [r for r in rows[1:] if not r[id_col].startswith(f"{camera}-")]
+        if "approach" in rows[0] and name.startswith("signal"):   # approach-level events of that camera too
+            keep = [keep[0]] + [r for r in keep[1:] if r[rows[0].index("approach")] != "E"]
+        out = io.StringIO()
+        csv.writer(out, lineterminator="\n").writerows(keep)
+        with opener(path, "wt", encoding="utf-8", newline="") as f:
+            f.write(out.getvalue())
+    path = day_dir / f"system_{hour:02d}.csv"
+    rows = list(csv.reader(open(path, encoding="utf-8")))
+    col = rows[0].index(f"fps_{camera}")
+    for r in rows[1:]:
+        r[col] = "0.0"
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        csv.writer(f, lineterminator="\n").writerows(rows)
+
+
+def test_a_day_with_a_dead_camera_is_not_counted_as_no_traffic(prepared, tmp_path):
+    inter, _ds, _ = prepared
+    for day in ("2026-05-12", "2026-05-13"):
+        shutil.copytree(SAMPLE / day, tmp_path / day)
+    _unplug_camera(tmp_path / "2026-05-13", "B", 7)          # camera B looks at approach E
+    broken = load([tmp_path])
+    study.prepare(broken, inter)
+    p = study.measure(broken, inter, "am")
+    cov = p.tables["coverage"].set_index(["day", "approach"])
+    assert not cov.loc[("2026-05-13", "E"), "used"] and "0 of 60 minutes" in cov.loc[("2026-05-13", "E"), "why_not"]
+    assert cov["used"].sum() == 7
+    one_day = load([tmp_path / "2026-05-12"])
+    study.prepare(one_day, inter)
+    reference = {(g.approach, g.name): g.v for g in study.measure(one_day, inter, "am").groups}
+    for g in p.groups:
+        if g.approach == "E":   # the E design flow comes from the good day only, not halved
+            assert g.v == reference[("E", g.name)]
+
+
+def test_damaged_files_are_reported_and_the_rest_is_used(tmp_path):
+    day = tmp_path / "2026-05-12"
+    shutil.copytree(SAMPLE / "2026-05-12", day)
+    packed = (day / "tracks_17.csv.gz").read_bytes()
+    (day / "tracks_17.csv.gz").write_bytes(packed[: len(packed) // 2])        # a download cut off halfway
+    (day / "tracks_07.csv.gz.tmp").write_bytes(b"half-written by a power cut")  # left over, ignored
+    text = (day / "vehicles_07.csv").read_text(encoding="utf-8")
+    (day / "vehicles_07.csv").write_text("﻿" + text.replace("\n", "\r\n"), encoding="utf-8")  # BOM + CRLF
+    ds = load([tmp_path])
+    assert any("tracks_17.csv.gz" in p and "cannot be read" in p for p in ds.problems)
+    assert not any("vehicles_07" in p for p in ds.problems)                     # BOM and CRLF are fine
+    assert ds.tracks["file"].astype(str).str.contains("tracks_07").all()
+    assert len(ds.vehicles) == sum(1 for _ in open(SAMPLE / "2026-05-12" / "vehicles_07.csv")) - 1 + \
+        sum(1 for _ in open(SAMPLE / "2026-05-12" / "vehicles_17.csv")) - 1

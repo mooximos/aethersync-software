@@ -43,6 +43,22 @@ days in a row (weekends included, a dark evening hour) and running `tlopt all` o
 - The 17-day test (all 17 days read, 11 weekdays used, 4 hours a day, 13.4 million track rows) runs `tlopt all
   --seeds 3` in about 3 minutes.
 
+## More tests and fixes (second hardening pass)
+
+- Camera coverage: per study day and approach, the camera must have recorded at least 90% of the
+  period's minutes (frame rate above 0 in the system rows) and seen at least one vehicle. Days that
+  fail are left out for that approach only (its counts, delays, signals and design flow), so an
+  unplugged camera does not look like a day with little traffic. Table `<period>_coverage.csv`;
+  listed in report section 1. If an approach has no covered day at all, the period is skipped.
+- Data files saved with a byte-order mark or Windows line endings are read normally; a truncated
+  .gz is skipped with a message; leftover `.gz.tmp` files are ignored.
+- New tests: 30 random traffic cases for the optimizer (safe plan every time, never worse than an
+  allowed Webster plan), a dead camera, damaged files, and the real collector main loop with fake
+  cameras (records a car, closes files, no power-off, and no image file anywhere on disk while
+  the live view is open).
+- Not a bug, but worth knowing: when Webster's plan breaks the X <= 0.92 limit, the optimized plan
+  can have a little more delay than Webster's, because it keeps the limit.
+
 ## Defaults chosen in stage 4 (docs)
 
 - `requirements-analysis.txt` ends with `-e .`, which installs this project itself, so

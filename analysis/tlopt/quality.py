@@ -130,3 +130,39 @@ def cycle_stability(ds: Dataset) -> pd.DataFrame:
         rows.append({"day": day, "approach": approach, "greens": len(group), "median_cycle_s": round(median, 1),
                      "iqr_s": round(q3 - q1, 1), "share_within_2s_of_median": round(float(np.mean(abs(gaps - median) <= 2)), 2)})
     return pd.DataFrame(rows)
+
+
+MIN_COVERAGE = 0.9   # a camera must have worked for 90% of a period's minutes for that day to count
+
+
+def coverage(ds: Dataset, inter, period: str) -> pd.DataFrame:
+    """Per study day x approach: did that approach's camera really record the whole period?
+
+    A day where a camera was unplugged, or the Pi was off for part of the period, would otherwise
+    look like a day with little traffic and pull the averages down. Uses the per-minute system rows
+    (frames per second of the camera) and whether any vehicle was seen from that approach."""
+    from tlopt.measures import period_mask
+    start, end = inter.period_minutes(period)
+    minutes = end - start
+    v = ds.vehicles
+    seen = v[period_mask(v["t_entered_s"], ds.zone, inter, period)].groupby(["day", "approach"]).size()
+    system = ds.system[period_mask(ds.system["time_s"], ds.zone, inter, period)] if len(ds.system) else ds.system
+    rows = []
+    for day in ds.used_days:
+        sys_day = system[system["day"] == day] if len(system) else system
+        for approach in inter.approaches:
+            camera = camera_of(ds.sites[day], approach)
+            vehicles = int(seen.get((day, approach), 0))
+            if len(sys_day) and camera and f"fps_{camera}" in sys_day:
+                working = int((pd.to_numeric(sys_day[f"fps_{camera}"], errors="coerce") > 0).sum())
+                share = working / minutes
+                why = "" if share >= MIN_COVERAGE else f"camera worked {working} of {minutes} minutes"
+            else:   # no system rows for that day: judge by the vehicles alone
+                working, why = None, ""
+            if camera is None:
+                why = "no camera for this approach in site.json"
+            elif vehicles == 0:
+                why = why or "no vehicles seen from this approach"
+            rows.append({"day": day, "approach": approach, "camera": camera or "", "minutes_working": working,
+                         "vehicles": vehicles, "used": why == "", "why_not": why})
+    return pd.DataFrame(rows, columns=["day", "approach", "camera", "minutes_working", "vehicles", "used", "why_not"])

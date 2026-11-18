@@ -288,6 +288,12 @@ road work) so you can leave it out in Part 3.
 | Collector log | `journalctl -u intersection-monitor -f` over SSH (Ctrl+C to stop watching). |
 | Restart the collector | `sudo systemctl restart intersection-monitor` |
 | `python -m tlopt` says no intersection.yaml | Make `analysis/intersection.yaml` (Part 3), or add `--intersection PATH`. |
+| Status page says NOT RECORDING in red | The Pi's clock looks wrong. Press **Clock sync**; recording starts by itself. |
+| "latitude, longitude: still 0.0, 0.0" | Type the intersection's position into `collector/site.json` (Part 1, step 5). |
+| "period pm: SKIPPED ..." | The message says why: no data at those times, too dark (winter evenings), or no study day. Change `periods` or `options` in `intersection.yaml`. |
+| A camera was unplugged for a day | Nothing to do: that approach's day is left out of the averages and listed in report section 1. Fix the camera and keep collecting. |
+| "is still zipped" | Unzip that day into the data folder. Folders like `YYYY-MM-DD\YYYY-MM-DD\` from Windows "Extract All" are fine. |
+| Opened a data file in Excel | Only look, never **Save**: Excel changes numbers like `0.0` to `0` and the rows then fail the check. Download the day again if you saved it. |
 
 ## Privacy and safety
 

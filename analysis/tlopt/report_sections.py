@@ -33,6 +33,13 @@ def measured(doc, inter, summary, measures: Path) -> None:
     exclusions = _read(measures / "exclusions.csv")
     if exclusions is not None:
         doc.table(exclusions, "Vehicles left out, and why")
+    for period in summary["periods"]:
+        cov = _read(measures / f"{period}_coverage.csv")
+        if cov is not None and (~cov["used"].astype(bool)).any():
+            gone = cov[~cov["used"].astype(bool)]
+            doc.p(f"{period}: {len(gone)} day-approach combination(s) were left out because the camera did not "
+                  "record the whole period (a missing day would otherwise look like a day with little traffic): "
+                  + "; ".join(f"{r.day} {r.approach} ({r.why_not})" for r in gone.itertuples()) + ".")
     quality = _read(measures / "quality.csv")
     if quality is not None:
         doc.table(quality, "Data quality per day, approach and hour (fps = processed camera frames per second; "
