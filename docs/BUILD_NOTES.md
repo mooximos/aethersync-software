@@ -9,7 +9,7 @@ records where the build stands and the decisions made so far.
 |---|---|---|
 | 1 | `common/`, `tools/make_sample_data.py`, `sample_data/` | **done** |
 | 2 | `collector/` (with replay mode and `check_hardware.py`) | **done**, 161 tests pass in total (`python -m pytest`) |
-| 3 | `analysis/` (with SUMO and the report) | not started |
+| 3 | `analysis/` (with SUMO and the report) | **done**, 201 tests pass in total |
 | 4 | `README.md` (student guide), `docs/DATA_FORMAT.md` | not started (README is a placeholder) |
 
 ## Defaults chosen in stage 1
@@ -99,6 +99,55 @@ Sample data generator:
   frame only while a page asks for them; a frame is held in RAM for 10 s after the last request.
 - **Clock sync**: `source` is phone if the browser says Mobile/Android/iPhone/iPad, else laptop.
 - **`collector/site.json` is not committed** (it may hold the web password); `site.example.json` is.
+
+## Defaults chosen in stage 3 (analysis)
+
+Method details the brief left open (none changes the data format):
+- **Delay statistics also leave out `started_in_view`** (besides no_cross, short_track and
+  id_switch_suspect): those tracks miss the start of the wait, so their delay is too low. They are
+  still counted as traffic. Every exclusion is counted in the report.
+- **Free-flow speed** is the 85th percentile speed of never-stopped vehicles per approach *and
+  movement* (when at least 20 such vehicles exist, else per approach), so the slower speed of
+  turning cars is not counted as signal delay.
+- **Lane groups**: exclusive left lanes, exclusive right lanes, and the rest (shared lanes go with
+  the through lanes). Vehicles in an unknown lane are placed by their turn.
+- **Saturation flow**: a lane needs 30 headways (from the 5th queued vehicle, consecutive queue
+  positions, under 10 s apart); a group with any default lane is marked "default".
+- **Design flow for the model** = the lane group's arrivals in that day's busiest 15 minutes x 4,
+  averaged over the days (HCM practice: hourly volume / PHF).
+- **Effective green = displayed green**, since lost time per phase = yellow + all-red (as specified).
+- **Pedestrian minimum** for a through phase uses the longer of the two crosswalks parallel to it.
+- **X <= 0.92 is applied to every lane group** (stricter than only the critical ones). If it cannot
+  be met, the optimizer finds the lowest possible largest X, uses that +0.01, and says so.
+- **Estimated max wait** = red + (95th percentile arrivals during red, normal approximation of the
+  Poisson) x saturation headway, for the busiest lane group of the approach. It is an upper estimate.
+- **Rounding**: ring 1's greens are rounded together (largest remainder) so the cycle keeps its
+  length, never below a minimum; ring 2 is fitted to it. The best 5 cycles and Webster's split are
+  compared after rounding and the best plan that breaks no constraint is kept.
+- **Time of day**: separate plans if cycles differ by more than 10 s, or any phase's share of the
+  cycle differs by more than 10% (relative). Otherwise the period plan with the lowest total delay
+  over all periods is recommended for all.
+- **Model check**: per day x approach x 15-min interval, by arrival time, intervals with at least 5
+  vehicles. Verdict: "well" if the mean absolute percentage error is <= 15%, "roughly" if <= 30%.
+- **Inferred current plan** (when there is no timing sheet): inferred greens and cycle, with ITE
+  yellow and all-red, because the cameras cannot see the yellow.
+- **Outages** count only gaps that fall inside a scheduled recording window.
+- **SUMO**: lane 0 of every edge is a sidewalk; permissive lefts and right turns yield ('g');
+  crosswalks show WALK for walk_s at the start of the parallel green. Trucks are SUMO "delivery"
+  vehicles, 6.5 m. Demand = mean arrivals over days per 15 min, drawn as Poisson per seed; unknown
+  turns are shared out over the approach's known movements. The warm-up repeats the first 15 min.
+  tau is calibrated on through-only lanes (bisection, at most 10 runs).
+- **SUMO delay** = SUMO time loss minus the median time loss of non-stopping vehicles of the same
+  approach, movement and type in that run (driver randomness and turning slow-downs are not signal
+  delay). The raw time loss is reported too.
+- **Python 3.11**: numpy 2.5 and scipy 1.18 need 3.12, so requirements-analysis.txt installs
+  numpy 2.4.6 and scipy 1.17.1 on 3.11. All non-collector tests pass with those versions too.
+
+What the sample data shows (it is synthetic, but it exercises every step): the current sheet's
+2.0 s all-red is shorter than the ITE 2.3 s; the pedestrian minimum greens (25.3 s) set the
+shortest cycle, 63 s, and the optimizer chooses it; the HCM model matches the measured delays within
+8-9%; SUMO's left turners yield to oncoming traffic but the generator's do not, which makes SUMO's
+delay a few seconds higher on approaches facing heavy traffic.
 
 ## Accuracy depends on box jitter (measure this on the Pi)
 

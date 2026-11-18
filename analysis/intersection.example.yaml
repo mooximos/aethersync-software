@@ -1,0 +1,45 @@
+# What the cameras cannot see. Copy this to intersection.yaml and edit it.
+# Lane numbers and movements must match site.json (lane 1 = curbside lane).
+# This example matches the synthetic sample_data (tools/make_sample_data.py).
+name: Sample Intersection (synthetic data)
+
+approaches:          # N = traffic coming FROM the north
+  N: {lanes: {"1": [R, T], "2": [T], "3": [L]}, speed_limit_mph: 30, grade_pct: 0.0, ped_crossing_ft: 64, clear_width_ft: 80}
+  S: {lanes: {"1": [R, T], "2": [T], "3": [L]}, speed_limit_mph: 30, grade_pct: 0.0, ped_crossing_ft: 64, clear_width_ft: 80}
+  E: {lanes: {"1": [R, T], "2": [T], "3": [L]}, speed_limit_mph: 30, grade_pct: 0.0, ped_crossing_ft: 64, clear_width_ft: 80}
+  W: {lanes: {"1": [R, T], "2": [T], "3": [L]}, speed_limit_mph: 30, grade_pct: 0.0, ped_crossing_ft: 64, clear_width_ft: 80}
+
+# NEMA ring-barrier phases. Ring 1 = phases 1 2 | 3 4, ring 2 = 5 6 | 7 8 ("|" = barrier).
+# Leave out phases the intersection does not have. left: protected, permissive or none.
+phases:
+  "2": {approach: S, movements: [T, R, L], left: permissive}
+  "6": {approach: N, movements: [T, R, L], left: permissive}
+  "4": {approach: W, movements: [T, R, L], left: permissive}
+  "8": {approach: E, movements: [T, R, L], left: permissive}
+
+# The city's timing sheet, if you have it (optional; delete this block if not).
+# The sample generator leaves 4 s of its 120 s cycle unused after the E/W yellow;
+# here that is written as extra all-red on phases 4 and 8.
+timing_sheet:
+  cycle_s: 120
+  phases:
+    "2": {green_s: 50, yellow_s: 4.0, all_red_s: 2.0}
+    "6": {green_s: 50, yellow_s: 4.0, all_red_s: 2.0}
+    "4": {green_s: 54, yellow_s: 4.0, all_red_s: 6.0}
+    "8": {green_s: 54, yellow_s: 4.0, all_red_s: 6.0}
+  note: "sample generator plan"
+
+pedestrians:
+  walk_s: 7
+  walk_speed_ftps: 3.5
+  peds_per_hour: {N: 30, S: 30, E: 30, W: 30}   # people crossing each leg per hour
+
+periods:             # local clock time
+  am: "07:00-08:00"
+  pm: "17:00-18:00"
+
+options:
+  daylight_only: true
+  cycle_bounds_s: [60, 180]
+  max_degree_of_saturation: 0.92
+  max_wait_cap_s: null     # e.g. 90 to forbid plans where someone may wait longer than 90 s

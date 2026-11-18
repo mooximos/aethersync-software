@@ -18,6 +18,6 @@ tlopt = "analysis/tlopt"
 
 [tool.pytest.ini_options]
 # Lets the tests import common, monitor, tlopt and the tools without installing anything.
-pythonpath = [".", "collector", "collector/tests", "analysis", "tools"]
+pythonpath = [".", "collector", "collector/tests", "analysis", "analysis/tests", "tools"]
 testpaths = ["common/tests", "tools/tests", "collector/tests", "analysis/tests"]
 addopts = "--import-mode=importlib -q"

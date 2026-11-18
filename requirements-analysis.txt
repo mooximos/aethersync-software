@@ -1,6 +1,16 @@
-# Laptop (Windows 11, Python 3.11+):  pip install -r requirements-analysis.txt
-# Stage 1 (shared code, sample data generator, tests). Stage 3 adds
-# pandas, scipy, matplotlib, pyyaml, eclipse-sumo, traci and sumolib.
-numpy==2.5.3
+# Laptop (Windows 11, Python 3.11 or newer):
+#   pip install -r requirements-analysis.txt
+# Runs the sample data generator, the analysis (python -m tlopt) and the tests.
+# SUMO comes from pip (eclipse-sumo); SUMO_HOME does not need to be set.
+numpy==2.5.3; python_version >= "3.12"
+numpy==2.4.6; python_version < "3.12"     # the last numpy for Python 3.11
+scipy==1.18.1; python_version >= "3.12"
+scipy==1.17.1; python_version < "3.12"    # the last scipy for Python 3.11
+pandas==3.0.5
+matplotlib==3.11.2
+pyyaml==6.0.3
 pydantic==2.13.5
+eclipse-sumo==1.28.0
+sumolib==1.28.0
+traci==1.28.0
 pytest==9.2.0
