@@ -39,7 +39,9 @@ periods:             # local clock time
   pm: "17:00-18:00"
 
 options:
-  daylight_only: true
+  daylight_only: true      # leave out twilight and night vehicles (night accuracy is not checked yet)
+  days: [Mon, Tue, Wed, Thu, Fri]   # days of the week to study; weekends have different traffic
+  skip_dates: []           # days to leave out (holiday, crash nearby), written [YYYY-MM-DD, YYYY-MM-DD]
   cycle_bounds_s: [60, 180]
   max_degree_of_saturation: 0.92
   max_wait_cap_s: null     # e.g. 90 to forbid plans where someone may wait longer than 90 s

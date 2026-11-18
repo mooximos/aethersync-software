@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 from tlopt.intersection import IntersectionError, load_intersection
+from tlopt.load import DAY_NAMES
 
 
 def find_intersection(given: Path | None) -> Path:
@@ -67,21 +68,35 @@ def cmd_measure(args, inter, keep_going: bool = False):
     keep = ["key", "day", "vehicle_id", "approach", "lane", "group", "turn", "type", "t_entered", "t_crossed",
             "wait_s", "stops", "queue_pos", "control_delay_s", "ffs_mps", "exclusion", "file"]
     ds.vehicles[keep].to_csv(out / "vehicle_delays.csv", index=False)
-    periods = {}
+    periods, skipped = {}, {}
     for name in inter.periods:
         try:
             periods[name] = study.measure(ds, inter, name)
         except ValueError as error:
-            print(f"  period {name}: skipped ({error})")
-    summary = {"days": ds.days, "weekdays": sorted(set(ds.vehicles["weekday"])), "vehicles": int(len(ds.vehicles)),
+            skipped[name] = str(error)
+            print(f"  period {name}: SKIPPED - {error}")
+            for folder in ("measures", "plans"):   # no old results for it may be left to mix in
+                for old in (args.results / folder).glob(f"{name}_*"):
+                    if not any(old.name.startswith(f"{other}_") for other in inter.periods
+                               if other != name and other.startswith(name)):
+                        old.unlink()
+    left_out = [d for d in ds.days if d not in ds.used_days]
+    if left_out:
+        print(f"  Days left out (options.days / skip_dates in intersection.yaml): {', '.join(left_out)}")
+    if not periods:
+        raise SystemExit("No period has usable data, so there is nothing to optimize. See the messages above.")
+    summary = {"days": ds.used_days, "days_left_out": left_out,
+               "weekdays": sorted(set(ds.vehicles.loc[ds.vehicles["day"].isin(ds.used_days), "weekday"]),
+                           key=DAY_NAMES.index),
+               "vehicles": int(ds.vehicles["day"].isin(ds.used_days).sum()),
                "counted": int(ds.vehicles["counted"].sum()), "in_delay_stats": int(ds.vehicles["delay_ok"].sum()),
-               "periods": {k: inter.periods[k] for k in periods}, "problems": ds.problems,
+               "periods": {k: inter.periods[k] for k in periods}, "periods_skipped": skipped, "problems": ds.problems,
                "intersection": inter.name, "time_zone": ds.zone}
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
     if not keep_going:
         for p in periods.values():
             study.save(p, args.results)
-        print(f"Measured {summary['vehicles']} vehicles on {len(ds.days)} days; tables saved in {out}")
+        print(f"Measured {summary['vehicles']} vehicles on {len(ds.used_days)} days; tables saved in {out}")
     return ds, periods
 
 

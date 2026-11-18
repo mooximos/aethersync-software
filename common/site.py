@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -168,6 +169,16 @@ class Site(Strict):
     def _check(self) -> "Site":
         if not self.stopped_speed_mps < self.moving_speed_mps:
             raise ValueError("stopped_speed_mps must be smaller than moving_speed_mps")
+        if self.latitude == 0 and self.longitude == 0:
+            raise ValueError("latitude, longitude: still 0.0, 0.0; type the intersection's position from an "
+                             "online map (west of Greenwich the longitude is negative, e.g. -122.3). Day and "
+                             "night are worked out from it")
+        zone = ZoneInfo(self.time_zone)   # its name was checked above
+        standard_h = min(datetime(2001, month, 1, 12, tzinfo=zone).utcoffset().total_seconds() / 3600
+                         for month in (1, 7))       # the offset without daylight saving time
+        if abs(standard_h - self.longitude / 15) > 4:
+            raise ValueError(f"longitude: {self.longitude} does not fit time_zone {self.time_zone} "
+                             "(did the minus sign get lost? West of Greenwich the longitude is negative)")
         approaches = [camera.approach for camera in self.cameras.values()]
         if len(set(approaches)) != len(approaches):
             raise ValueError("cameras: two cameras have the same approach")

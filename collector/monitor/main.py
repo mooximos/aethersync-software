@@ -31,8 +31,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--replay", type=Path, help="run on this video file instead of the cameras")
     parser.add_argument("--camera", default="A", help="with --replay: which camera's settings the video uses")
     parser.add_argument("--out", type=Path, help="with --replay: output folder (default data_test)")
-    parser.add_argument("--start", help="with --replay: local start time of the video, e.g. 2026-11-16T07:00:00 "
-                                        "(default: now)")
+    parser.add_argument("--start", help="with --replay: local start time of the video, written "
+                                        "YYYY-MM-DDTHH:MM:SS (default: now)")
     return parser.parse_args(argv)
 
 
@@ -49,7 +49,10 @@ def replay(args: argparse.Namespace, site) -> None:
         raise SystemExit(f"camera {args.camera} is not in {args.site}")
     detector = make_detector(args.detector or "ultralytics", site, args.fake_boxes)
     if args.start:
-        start = datetime.fromisoformat(args.start).replace(tzinfo=site.zone()).timestamp()
+        try:
+            start = datetime.fromisoformat(args.start).replace(tzinfo=site.zone()).timestamp()
+        except ValueError:
+            raise SystemExit(f"--start {args.start!r}: write it as YYYY-MM-DDTHH:MM:SS, local time")
     else:
         start = time.time()
     only_one = site.model_copy(update={"cameras": {args.camera: site.cameras[args.camera]}})

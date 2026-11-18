@@ -11,21 +11,32 @@ DELAY_FLAGS = ["no_cross", "short_track", "id_switch_suspect", "started_in_view"
 OUTAGE_S = 120
 
 
-def mark_exclusions(ds: Dataset, daylight_only: bool) -> pd.DataFrame:
-    """Adds columns: in_daylight_rule, delay_ok, and a short exclusion reason. Returns the counts."""
+def mark_exclusions(ds: Dataset, daylight_only: bool, days: list[str] | None = None,
+                    skip_dates: list[str] | None = None) -> pd.DataFrame:
+    """Adds columns: excluded (left out of everything), counted, delay_ok and a short exclusion reason.
+    Returns the counts per rule."""
     v = ds.vehicles
-    v["excluded_light"] = (v["light"] != "day") if daylight_only else False
+    days = days or ["Mon", "Tue", "Wed", "Thu", "Fri"]
+    skipped = v["day"].isin([str(d) for d in (skip_dates or [])])
+    other_day = ~v["weekday"].isin(days) & ~skipped
+    dark = ((v["light"] != "day") if daylight_only else pd.Series(False, index=v.index)) & ~skipped & ~other_day
+    v["excluded"] = skipped | other_day | dark
     reason = pd.Series("", index=v.index)
     for flag in DELAY_FLAGS:
         reason = reason.where(reason != "", np.where(v["flag_" + flag], flag, ""))
-    reason = reason.where(~v["excluded_light"], "not daylight (" + v["light"] + ")")
+    reason = reason.where(~dark, "not daylight (" + v["light"] + ")")
+    reason = reason.where(~other_day, "not a study day (" + v["weekday"] + ")")
+    reason = reason.where(~skipped, "date in skip_dates")
     v["exclusion"] = reason
-    v["counted"] = ~v["excluded_light"] & v["t_crossed_s"].notna()
+    v["counted"] = ~v["excluded"] & v["t_crossed_s"].notna()
     v["delay_ok"] = v["exclusion"] == ""
-    rows = [{"rule": "not in daylight (daylight_only)", "vehicles": int(v["excluded_light"].sum()),
+    rows = [{"rule": "date listed in skip_dates", "vehicles": int(skipped.sum()), "effect": "left out of everything"},
+            {"rule": f"day of week not in days ({', '.join(days)})", "vehicles": int(other_day.sum()),
+             "effect": "left out of everything"},
+            {"rule": "not in daylight (daylight_only)", "vehicles": int(dark.sum()),
              "effect": "left out of everything"}]
     for flag in DELAY_FLAGS:
-        n = int((v["flag_" + flag] & ~v["excluded_light"]).sum())
+        n = int((v["flag_" + flag] & ~v["excluded"]).sum())
         rows.append({"rule": f"flag {flag}", "vehicles": n,
                      "effect": "left out of delay statistics; counted as traffic if it crossed"})
     kept = {"queue_past_view": "kept; its wait is a lower bound (the queue went past the view)",

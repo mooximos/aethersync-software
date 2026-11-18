@@ -3,6 +3,7 @@ import shutil
 
 import numpy as np
 import pytest
+import yaml
 
 from tlopt import measures, quality, study, timing, validate
 from tlopt.intersection import IntersectionError, load_intersection
@@ -137,3 +138,50 @@ def test_intersection_errors_name_the_key(tmp_path):
 def test_lane_groups_follow_the_lanes():
     groups = measures.lane_groups(intersection())
     assert {(g.approach, g.name, tuple(g.lanes)) for g in groups if g.approach == "N"} == {("N", "TR", (1, 2)), ("N", "L", (3,))}
+
+
+def test_study_days_and_skip_dates_leave_whole_days_out(prepared):
+    default, ds, _ = prepared
+    try:
+        inter = intersection(options={"days": ["Tue"]})        # 2026-05-12 is a Tuesday, 05-13 a Wednesday
+        table = study.prepare(ds, inter).set_index("rule")["vehicles"]
+        wednesday = int((ds.vehicles["day"] == "2026-05-13").sum())
+        assert ds.study_days == ["2026-05-12"] and table["day of week not in days (Tue)"] == wednesday
+        assert not ds.vehicles.loc[ds.vehicles["day"] == "2026-05-13", "counted"].any()
+        inter = intersection(options={"skip_dates": ["2026-05-12"]})
+        table = study.prepare(ds, inter).set_index("rule")["vehicles"]
+        assert ds.study_days == ["2026-05-13"]
+        assert table["date listed in skip_dates"] == int((ds.vehicles["day"] == "2026-05-12").sum())
+    finally:
+        study.prepare(ds, default)
+
+
+def test_an_empty_period_says_why(prepared, tmp_path):
+    default, ds, _ = prepared
+    try:
+        inter = intersection(periods={"noon": "12:00-13:00"})
+        study.prepare(ds, inter)
+        with pytest.raises(ValueError, match="Hours in the data: 07:00, 17:00"):
+            study.measure(ds, inter, "noon")
+        inter = intersection(options={"days": ["Sat", "Sun"]})
+        study.prepare(ds, inter)
+        with pytest.raises(ValueError, match="is a study day"):
+            study.measure(ds, inter, "am")
+    finally:
+        study.prepare(ds, default)
+
+
+def test_a_bad_skip_date_is_refused(tmp_path):
+    data = example_dict()
+    data["options"] = {"skip_dates": ["Dec 24"]}
+    path = tmp_path / "intersection.yaml"
+    path.write_text(yaml.safe_dump(data))
+    with pytest.raises(IntersectionError, match="skip_dates"):
+        load_intersection(path)
+
+
+def test_a_day_in_two_places_is_used_once(tmp_path):
+    shutil.copytree(SAMPLE / "2026-05-12", tmp_path / "copy" / "2026-05-12")
+    ds = load([SAMPLE, tmp_path / "copy"], with_tracks=False)
+    assert ds.vehicles["key"].is_unique and ds.days == ["2026-05-12", "2026-05-13"]
+    assert any("is in two places" in p for p in ds.problems)

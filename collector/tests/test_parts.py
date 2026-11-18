@@ -164,3 +164,40 @@ def test_vehicle_ids_continue_after_a_restart(tmp_path):
     again = PipelineRig(tmp_path)
     assert again.recorder.new_vehicle_id("A", 100.0) == "A-0002"
     assert again.recorder.new_vehicle_id("B", 100.0) == "B-0001"
+
+
+def test_clock_problem_finds_a_clock_that_went_backwards(tmp_path):
+    import os
+    from monitor.clock import clock_problem
+    day = tmp_path / "2026-12-05"
+    day.mkdir()
+    (day / "events.log").write_text("x\n")
+    written = (day / "events.log").stat().st_mtime
+    no_rtc = str(tmp_path / "missing_rtc")
+    assert clock_problem(written + 3600, tmp_path, no_rtc) is None          # later than the files: fine
+    assert "behind the newest data file" in clock_problem(written - 7200, tmp_path, no_rtc)
+    rtc = tmp_path / "since_epoch"
+    rtc.write_text(f"{int(written + 3600)}\n")
+    assert clock_problem(written + 3600, tmp_path, str(rtc)) is None         # RTC agrees
+    assert "RTC" in clock_problem(written + 3600 + 900, tmp_path, str(rtc))  # RTC 15 min off
+    assert clock_problem(0, tmp_path / "empty_dir_that_does_not_exist", no_rtc) is None
+    os.remove(day / "events.log")
+
+
+def test_service_waits_for_a_clock_sync_when_the_clock_went_backwards(tmp_path, capsys):
+    import os
+    import time as _time
+    from monitor.service import Service
+    site = sample_site()
+    day = tmp_path / "2026-12-05"
+    day.mkdir()
+    future = _time.time() + 6 * 3600          # a file written "later" than now: the clock went back
+    (day / "events.log").write_text("x\n")
+    os.utime(day / "events.log", (future, future))
+    service = Service(site, tmp_path / "site.json", tmp_path, "fake")
+    service.check_clock()
+    assert service.clock_warning and "behind the newest data file" in service.clock_warning
+    assert "not recording until a clock sync" in capsys.readouterr().out
+    os.utime(day / "events.log", (_time.time(), _time.time()))
+    service.check_clock()
+    assert service.clock_warning is None

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -59,6 +60,8 @@ class Pedestrians(Strict):
 
 class Options(Strict):
     daylight_only: bool = True
+    days: list[Literal["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]] = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+    skip_dates: list[str] = []     # e.g. holidays or a day with a crash; YYYY-MM-DD
     cycle_bounds_s: tuple[float, float] = (60, 180)
     max_degree_of_saturation: float = Field(default=0.92, gt=0, le=1.5)
     max_wait_cap_s: Optional[float] = None
@@ -93,6 +96,13 @@ class Intersection(Strict):
         for name, text in self.periods.items():
             if not _PERIOD.match(text):
                 raise ValueError(f"periods.{name}: write it like 07:00-09:00")
+        for text in self.options.skip_dates:
+            try:
+                date.fromisoformat(str(text))
+            except ValueError:
+                raise ValueError(f"options.skip_dates: {text!r} is not a date written YYYY-MM-DD")
+        if not self.options.days:
+            raise ValueError("options.days: list at least one day, e.g. [Mon, Tue, Wed, Thu, Fri]")
         low, high = self.options.cycle_bounds_s
         if not 0 < low < high:
             raise ValueError("options.cycle_bounds_s: must be [smaller, larger]")

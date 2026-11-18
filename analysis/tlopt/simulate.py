@@ -45,7 +45,13 @@ def simulate(inter: Intersection, results: Path, seeds: int = 10, log=print, pro
     started = time.time()
     out = results / "sumo"
     out.mkdir(parents=True, exist_ok=True)
-    periods = [p for p in inter.periods if (results / "plans" / f"{p}_optimized.json").exists()]
+    studied = json.loads((results / "measures" / "summary.json").read_text())["periods"] \
+        if (results / "measures" / "summary.json").exists() else inter.periods
+    periods = [p for p in inter.periods if p in studied and (results / "plans" / f"{p}_optimized.json").exists()
+               and (results / "measures" / f"{p}_sumo_demand.csv").exists()]
+    for p in inter.periods:
+        if p in studied and p not in periods:
+            log(f"SUMO: period {p} skipped, its plans or demand are missing (run `optimize` again)")
     if not periods:
         raise FileNotFoundError(f"no plans in {results / 'plans'}: run `optimize` first")
     folder = sm.work_dir()

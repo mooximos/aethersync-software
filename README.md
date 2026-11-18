@@ -114,8 +114,9 @@ shunt in the + wire of the 12 V battery; and Wi-Fi internet at home for the inst
    ```
    From now on the Pi is at **10.42.0.1** on the *IntersectionMonitor* network.
 5. **Settings.** Edit `collector/site.json` (`nano collector/site.json`). Replace every value
-   that says REPLACE: the site name, your names, latitude and longitude (from a map), and each
-   camera's `usb_path`. The paths are listed by the next step. Camera A goes in the top USB 3
+   that says REPLACE: the site name, your names, and each camera's `usb_path`. Also set
+   `latitude` and `longitude` (right-click the intersection in an online map); in the Americas
+   the longitude is negative, e.g. -121.87. The Pi will not start while they are still 0.0. The paths are listed by the next step. Camera A goes in the top USB 3
    port, B the bottom USB 3, C the top USB 2, D the bottom USB 2. Write down which camera
    looks at which approach (`approach` = the direction the traffic comes FROM).
    Optional: set `"web_password"` to protect the web page.
@@ -142,8 +143,11 @@ pip install -r requirements-collector.txt opencv-python-headless==5.0.0.93 ultra
 ```
 
 ```bash
-python -m monitor --replay my_video.mp4 --camera A --detector ultralytics --site collector/site.json --out data_test --start 2026-11-16T07:00:00
+python -m monitor --replay my_video.mp4 --camera A --detector ultralytics --site collector/site.json --out data_test
 ```
+
+The rows get today's date and time unless you add `--start` with when you filmed it, written
+`YYYY-MM-DDTHH:MM:SS` (local time).
 
 First copy `collector/site.example.json` to `collector/site.json`. The replay writes real data
 files to `data_test/`. Without a calibration for that video the vehicles are flagged
@@ -198,6 +202,18 @@ speeds or waits. To get those, put a homography for the video in `site.json` (ca
 
 The Pi records on weekdays 06:30-09:30 and 15:30-18:30 (change `schedule` in `site.json`).
 Between windows it switches itself off and wakes up 10 minutes before the next one.
+Nothing in the software is tied to particular dates: it records on the days and times in
+`schedule` for as long as it has power, so you can start and stop a collection whenever you want.
+To record on weekends too, add `"Sat", "Sun"` to the `days` of each window.
+
+**Winter evenings.** From about November to January it is dark before 17:00. The cameras keep
+recording at night (night mode), but the analysis leaves out twilight and night vehicles unless
+you turn that off (`daylight_only` in `intersection.yaml`, see Part 3). Plan an evening study
+period that is still light, or check the night accuracy first.
+
+**The clock.** If the Pi's clock looks wrong when it starts (it is behind the files it already
+wrote, or it disagrees with the clock chip because the clock battery is flat), it does **not**
+record. The Status page then says *NOT RECORDING* in red; press **Clock sync** and it starts.
 
 Once a week:
 
@@ -211,7 +227,7 @@ Once a week:
      80 C, and there is enough disk space.
    - **Clock sync:** press it every visit (the clock drifts a little).
    - **Download:** download every new day as a zip. Days you already downloaded are marked.
-3. On the laptop, unzip each day into a `data/` folder (you get `data/2026-11-16/` and so on),
+3. On the laptop, unzip each day into a `data/` folder (you get one `data/YYYY-MM-DD/` folder per day),
    then check the data:
    ```bash
    python -m tlopt check data
@@ -221,8 +237,9 @@ Once a week:
    counts differ by more than 3%.
 4. Read `events.log` in each day folder for errors.
 
-Tip: weekdays are what count, so collect at least one full week (better two or three) before
-drawing conclusions.
+Tip: collect at least one full week (better two or three) of weekdays before drawing
+conclusions. Write down any day that was not normal (a holiday, school break, a crash nearby,
+road work) so you can leave it out in Part 3.
 
 ---
 
@@ -236,7 +253,13 @@ drawing conclusions.
    - **Phases:** the signal's phases (NEMA phase numbers 1-8).
    - **Timing sheet:** the city's timing sheet, if you can get it. Ask the city's traffic
      department; without it the timing is worked out from the data.
-   - **Periods:** the study periods, e.g. `am: "07:00-09:00"`.
+   - **Periods:** the study periods, as clock times only (no dates), e.g. `am: "07:00-09:00"`.
+     They must be inside the recording windows, and in daylight unless you turn off
+     `daylight_only`. If a period has no usable data, the program says why and skips it.
+   - **Which days:** `days` (default Monday to Friday) and `skip_dates` (unusual days, written
+     `[YYYY-MM-DD, YYYY-MM-DD]`). Every day folder you give it is used except those; the report lists the
+     days used and the ones left out. To study only some weeks, put only those day folders in
+     the data folder, or give several folders: `python -m tlopt all data/week1 data/week2`.
 2. Run everything:
    ```bash
    python -m tlopt all data

@@ -57,10 +57,10 @@ def parse_splits(text: str, cycle: float) -> SignalPlan:
     return plan
 
 
-def weekdays_from(start: str, count: int) -> list[str]:
+def weekdays_from(start: str, count: int, weekends: bool = False) -> list[str]:
     day, days = date.fromisoformat(start), []
     while len(days) < count:
-        if day.weekday() < 5:
+        if weekends or day.weekday() < 5:
             days.append(day.isoformat())
         day += timedelta(days=1)
     return days
@@ -233,8 +233,9 @@ def make_day(out_dir: Path, day: str, day_index: int, args: argparse.Namespace) 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Make synthetic intersection data in the exact data format.")
     parser.add_argument("--out", type=Path, default=Path("sample_data"), help="folder to write the day folders into")
-    parser.add_argument("--start-date", default="2026-05-12", help="first day (weekends are skipped)")
-    parser.add_argument("--days", type=int, default=2, help="number of weekdays to make")
+    parser.add_argument("--start-date", default="2026-05-12", help="first day, YYYY-MM-DD (weekends are skipped unless --weekends)")
+    parser.add_argument("--days", type=int, default=2, help="number of days to make")
+    parser.add_argument("--weekends", action="store_true", help="make Saturdays and Sundays too")
     parser.add_argument("--hours", type=int, nargs="+", default=[7, 17], help="clock hours to make, e.g. 7 8 17")
     parser.add_argument("--seed", type=int, default=1, help="same seed = same data")
     parser.add_argument("--volumes", type=parse_volumes, default=None,
@@ -245,7 +246,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if any(not 0 <= hour <= 23 for hour in args.hours):
         parser.error("--hours must be between 0 and 23")
-    for index, day in enumerate(weekdays_from(args.start_date, args.days)):
+    for index, day in enumerate(weekdays_from(args.start_date, args.days, args.weekends)):
         day_dir = make_day(args.out, day, index, args)
         print(f"wrote {day_dir}")
 

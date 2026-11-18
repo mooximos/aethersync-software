@@ -12,6 +12,37 @@ records where the build stands and the decisions made so far.
 | 3 | `analysis/` (with SUMO and the report) | **done**, 201 tests pass in total |
 | 4 | `README.md` (student guide), `docs/DATA_FORMAT.md` | **done** |
 
+## Hardening pass (after stage 4)
+
+Nothing is tied to particular dates: the collector records on the `schedule` days and times for as
+long as it runs, and the analysis uses whatever day folders it is given. Checked by generating 17
+days in a row (weekends included, a dark evening hour) and running `tlopt all` on them.
+
+- `intersection.yaml` options `days` (default Mon-Fri) and `skip_dates` (default none): whole days
+  left out of everything; the exclusions table, the CLI and report section 1 list them. Signals
+  from left-out days are not used for timing either. The busiest-15-minute design flow is averaged
+  over the study days only.
+- An empty period is skipped with the reason (no data at those hours, all in darkness with
+  `daylight_only`, or no study day) instead of a bare error; the report says which were skipped.
+- Collector: does not record while the clock looks wrong (behind the newest data file by more than
+  2 min, or more than 2 min away from the RTC). The status page shows it in red; a clock sync
+  clears it.
+- site.json: latitude/longitude 0.0, 0.0 (the example's values) is refused, and so is a longitude
+  that does not fit the time zone by more than 4 hours (a lost minus sign). Day/night labels
+  depend on them.
+- Reading data: a day unzipped by Windows "Extract All" (`D/D/files`) is found; zips that were not
+  unzipped and days that appear in two folders are reported (a duplicate is used once).
+- Tracks are kept as numbers after reading each file (about 30 bytes per row), so weeks of data fit
+  in a laptop's memory: 4 days x 4 hours = 3.2 million rows load in about 25 s, peak 0.6 GB.
+- Generator: `--weekends` makes Saturdays and Sundays too.
+- Fixed: a period that is mostly dark (December 17:00-18:00) slipped through because a few cars
+  that entered at 16:59 in daylight were counted; it then gave meaningless plans and crashed SUMO.
+  Now a period with more than 25% of its vehicles outside daylight is skipped (with
+  `daylight_only`), and `simulate` skips a period whose inputs are missing instead of crashing.
+- Fixed: old results of a period that is skipped on a later run are deleted, so they cannot mix in.
+- The 17-day test (all 17 days read, 11 weekdays used, 4 hours a day, 13.4 million track rows) runs `tlopt all
+  --seeds 3` in about 3 minutes.
+
 ## Defaults chosen in stage 4 (docs)
 
 - `requirements-analysis.txt` ends with `-e .`, which installs this project itself, so

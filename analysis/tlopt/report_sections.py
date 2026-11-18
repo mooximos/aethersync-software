@@ -13,12 +13,18 @@ from tlopt.report import NAMES, _read
 def measured(doc, inter, summary, measures: Path) -> None:
     doc.h("1. What was measured")
     days = summary["days"]
-    doc.p(f"Cameras recorded every vehicle on all four approaches on {len(days)} weekday(s) "
-          f"({', '.join(days)}). Study periods: "
+    weekdays = ", ".join(summary.get("weekdays", []))
+    doc.p(f"Cameras recorded every vehicle on all four approaches on {len(days)} day(s) "
+          f"({', '.join(days)}; days of the week: {weekdays}). Study periods: "
           + "; ".join(f"{k} {v}" for k, v in summary["periods"].items()) + f" ({summary['time_zone']} local time). "
           f"{summary['vehicles']} vehicles were tracked; {summary['counted']} crossed the stop line and are counted "
           f"as traffic; {summary['in_delay_stats']} have a complete track and are used for delay statistics. "
           "Nobody counted anything by hand: every number comes from the timestamped rows.")
+    if summary.get("days_left_out"):
+        doc.p("Days in the data folder that were left out on purpose (options.days and skip_dates in "
+              "intersection.yaml): " + ", ".join(summary["days_left_out"]) + ".")
+    for name, reason in summary.get("periods_skipped", {}).items():
+        doc.p(f"Period {name} was not studied: {reason}.")
     if summary["problems"]:
         doc.p(f"The data check found {len(summary['problems'])} problem(s) in the files; rows that failed the "
               "check were left out. First ones: " + "; ".join(summary["problems"][:5]))

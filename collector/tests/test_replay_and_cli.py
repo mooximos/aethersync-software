@@ -49,7 +49,12 @@ def test_bad_site_json_is_refused_with_the_key_named(tmp_path, capsys):
     assert "cameras.B.approach" in capsys.readouterr().err
 
 
-def test_example_site_json_is_valid():
-    from monitor.config import REPO_DIR, load_site
-    site = load_site(REPO_DIR / "collector" / "site.example.json")
+def test_example_site_json_is_valid_once_the_position_is_typed_in():
+    from common.site import SiteError, validate_site
+    from monitor.config import REPO_DIR
+    data = json.loads((REPO_DIR / "collector" / "site.example.json").read_text())
+    with pytest.raises(SiteError, match="still 0.0, 0.0"):     # refuses to start until it is filled in
+        validate_site(data)
+    data["latitude"], data["longitude"] = 37.67, -121.87
+    site = validate_site(data)
     assert all(cam.homography is None for cam in site.cameras.values())

@@ -40,3 +40,39 @@ class Clock:
 
     def now(self) -> float:
         return self.wall(self._mono())
+
+
+RTC_SINCE_EPOCH = "/sys/class/rtc/rtc0/since_epoch"
+TOLERANCE_S = 120
+
+
+def newest_file_time(data_dir) -> float | None:
+    """Modification time of the newest file in the data folder (written with the clock of that day)."""
+    from pathlib import Path
+    newest = None
+    for path in Path(data_dir).glob("*/*"):
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        newest = mtime if newest is None else max(newest, mtime)
+    return newest
+
+
+def clock_problem(now: float, data_dir, rtc_path: str = RTC_SINCE_EPOCH) -> str | None:
+    """Why the system clock cannot be trusted right now, or None if nothing looks wrong.
+
+    No fixed dates are used: the clock is wrong if it is behind files it wrote itself, or if it
+    disagrees with the battery-backed RTC (a flat RTC battery resets the RTC when power is lost)."""
+    newest = newest_file_time(data_dir)
+    if newest is not None and now < newest - TOLERANCE_S:
+        return (f"the clock is {(newest - now) / 3600:.1f} hours behind the newest data file; "
+                "it was probably reset when the power went off")
+    try:
+        rtc = float(open(rtc_path).read().strip())
+    except (OSError, ValueError):
+        return None   # no RTC to compare with; check_hardware.py --rtc reports that separately
+    if abs(rtc - now) > TOLERANCE_S:
+        return (f"the system clock and the RTC differ by {abs(rtc - now) / 60:.0f} minutes; "
+                "the RTC battery may be flat or missing")
+    return None

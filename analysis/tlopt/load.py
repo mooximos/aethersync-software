@@ -12,6 +12,7 @@ from datetime import date
 from pathlib import Path
 
 import pandas as pd
+from pandas.api.types import union_categoricals
 
 from common import readers, schema
 from common.site import SiteError, validate_site
@@ -30,10 +31,15 @@ class Dataset:
     sites: dict[str, dict]
     zone: str
     problems: list[str] = field(default_factory=list)
+    study_days: list[str] | None = None    # set by study.prepare from options.days and skip_dates
 
     @property
     def days(self) -> list[str]:
         return sorted(self.sites)
+
+    @property
+    def used_days(self) -> list[str]:
+        return self.days if self.study_days is None else self.study_days
 
 
 def to_epoch(text: pd.Series) -> pd.Series:
@@ -79,13 +85,44 @@ def _numbers(frame: pd.DataFrame, columns: list[str]) -> None:
         frame[column] = pd.to_numeric(frame[column].where(frame[column] != ""), errors="coerce")
 
 
+def _compact_tracks(frame: pd.DataFrame) -> pd.DataFrame:
+    """tracks rows as numbers: key (day/vehicle_id), time_s, x_m, y_m, speed_mps, file, day."""
+    out = pd.DataFrame({"key": (frame["day"] + "/" + frame["vehicle_id"]).astype("category"),
+                        "time_s": to_epoch(frame["time"])})
+    for column in ("x_m", "y_m", "speed_mps"):
+        out[column] = pd.to_numeric(frame[column].where(frame[column] != ""), errors="coerce").astype("float32")
+    out["file"] = frame["file"].astype("category")
+    out["day"] = frame["day"].astype("category")
+    return out
+
+
+def _join_tracks(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    if not frames:
+        return _compact_tracks(pd.DataFrame(columns=schema.COLUMNS["tracks"] + ["file", "day"], dtype=str))
+    categorical = ("key", "file", "day")
+    out = pd.concat([f.drop(columns=list(categorical)) for f in frames], ignore_index=True)
+    for column in categorical:   # joined without ever turning back into millions of strings
+        out[column] = union_categoricals([f[column] for f in frames])
+    return out
+
+
 def load(data_dirs: list[Path], with_tracks: bool = True) -> Dataset:
     """Every day folder in data_dirs (a day folder itself, or a folder of day folders)."""
     problems: list[str] = []
-    day_dirs = sorted({d for data_dir in data_dirs for d in readers.list_day_folders(Path(data_dir))},
-                      key=lambda d: d.name)
+    found: dict[str, Path] = {}
+    for data_dir in data_dirs:
+        for name in readers.zips_not_unzipped(Path(data_dir)):
+            problems.append(f"{name} in {data_dir} is still zipped: unzip it there to use that day")
+        for day_dir in readers.list_day_folders(Path(data_dir)):
+            if day_dir.name in found and found[day_dir.name].resolve() != day_dir.resolve():
+                problems.append(f"day {day_dir.name} is in two places ({found[day_dir.name]} and {day_dir}); "
+                                f"only the first is used, so no vehicle is counted twice")
+                continue
+            found.setdefault(day_dir.name, day_dir)
+    day_dirs = [found[name] for name in sorted(found)]
     if not day_dirs:
-        raise FileNotFoundError(f"no day folders (YYYY-MM-DD) found in {', '.join(map(str, data_dirs))}")
+        hint = "; ".join(problems) or "each day must be a folder named YYYY-MM-DD"
+        raise FileNotFoundError(f"no day folders (YYYY-MM-DD) found in {', '.join(map(str, data_dirs))} ({hint})")
     parts: dict[str, list[pd.DataFrame]] = {k: [] for k in ("vehicles", "tracks", "signal_events", "system")}
     sites, syncs = {}, []
     for day_dir in day_dirs:
@@ -99,6 +136,8 @@ def load(data_dirs: list[Path], with_tracks: bool = True) -> Dataset:
                 continue
             frame = _read_kind(day_dir, kind, problems)
             frame["day"] = day_dir.name
+            if kind == "tracks":   # millions of rows: keep numbers only, so weeks of data fit in memory
+                frame = _compact_tracks(frame)
             parts[kind].append(frame)
         if (day_dir / "clock_sync.csv").exists():
             frame = pd.DataFrame(readers.read_rows(day_dir / "clock_sync.csv"), dtype=str)
@@ -128,12 +167,7 @@ def load(data_dirs: list[Path], with_tracks: bool = True) -> Dataset:
     for flag in schema.FLAGS:
         vehicles["flag_" + flag] = flags.str.split(";").map(lambda items, f=flag: f in items)
 
-    tracks = joined("tracks")
-    if len(tracks):
-        tracks["time_s"] = to_epoch(tracks["time"])
-        _numbers(tracks, ["x_m", "y_m", "speed_mps"])
-        tracks["key"] = tracks["day"] + "/" + tracks["vehicle_id"]
-        tracks = tracks.drop(columns=["time"])
+    tracks = _join_tracks(parts["tracks"])
 
     signals = joined("signal_events")
     signals["time_s"] = to_epoch(signals["time"])

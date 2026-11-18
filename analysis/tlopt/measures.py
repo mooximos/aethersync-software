@@ -174,7 +174,8 @@ def queues(v: pd.DataFrame, tracks: pd.DataFrame, signals: pd.DataFrame) -> pd.D
     distance from the stop line to the front of the last one. 'at least' if it reached the view edge."""
     stopped = v[v["t_stopped_s"].notna()].copy()
     if len(tracks):
-        t = tracks[["key", "time_s", "y_m"]].dropna().sort_values("time_s")
+        t = tracks.loc[tracks["key"].isin(stopped["key"]), ["key", "time_s", "y_m"]].dropna()
+        t = t.assign(key=t["key"].astype(str)).sort_values("time_s")
         stopped = pd.merge_asof(stopped.sort_values("t_stopped_s"), t, left_on="t_stopped_s", right_on="time_s",
                                 by="key", direction="nearest", tolerance=1.0)
     else:

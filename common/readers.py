@@ -52,12 +52,32 @@ def iter_rows(path: Path) -> Iterator[dict]:
         yield from csv.DictReader(handle)
 
 
+def _inner(day_dir: Path) -> Path:
+    """Windows 'Extract All' of 2026-12-05.zip makes 2026-12-05/2026-12-05/...: use the inner folder."""
+    inner = day_dir / day_dir.name
+    if not (day_dir / "site.json").exists() and inner.is_dir():
+        return inner
+    return day_dir
+
+
 def list_day_folders(data_dir: Path) -> list[Path]:
-    """All folders named YYYY-MM-DD inside data_dir, oldest first."""
+    """All folders named YYYY-MM-DD inside data_dir (or data_dir itself if it is one), oldest first."""
     data_dir = Path(data_dir)
+    if not data_dir.is_dir():
+        raise FileNotFoundError(f"{data_dir} is not a folder")
     if DAY_PATTERN.match(data_dir.name):
-        return [data_dir]
-    return sorted(p for p in data_dir.iterdir() if p.is_dir() and DAY_PATTERN.match(p.name))
+        return [_inner(data_dir)]
+    return sorted((_inner(p) for p in data_dir.iterdir() if p.is_dir() and DAY_PATTERN.match(p.name)),
+                  key=lambda p: p.name)
+
+
+def zips_not_unzipped(data_dir: Path) -> list[str]:
+    """Names of downloaded day zips in data_dir that have no unzipped day folder next to them."""
+    data_dir = Path(data_dir)
+    if not data_dir.is_dir():
+        return []
+    return sorted(p.name for p in data_dir.glob("*.zip")
+                  if DAY_PATTERN.match(p.stem) and not (data_dir / p.stem).is_dir())
 
 
 def hour_files(day_dir: Path, kind: str) -> list[tuple[int, Path]]:

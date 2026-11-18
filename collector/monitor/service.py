@@ -10,7 +10,7 @@ from pathlib import Path
 from common.timeutil import format_epoch
 from monitor import config, nightmode, schedule, sysinfo
 from monitor.camera import CameraCapture
-from monitor.clock import Clock
+from monitor.clock import Clock, clock_problem
 from monitor.detector import Frame, make_detector
 from monitor.pipeline import CameraPipeline
 from monitor.power import INA226, LowBatteryWatch
@@ -52,6 +52,7 @@ class Service:
         self.watching: dict[str, float] = {}      # camera -> last time someone asked for its picture
         self.latest: dict[str, tuple] = {}        # camera -> (image, boxes) while someone watches
         self.last_system: dict = {}
+        self.clock_warning: str | None = None     # set when the clock looks wrong; recording waits for a sync
 
     # ---- helpers -----------------------------------------------------------
     def log(self, text: str) -> None:
@@ -69,13 +70,14 @@ class Service:
         for sig in (signal.SIGTERM, signal.SIGINT):
             signal.signal(sig, lambda *_: self.stop_event.set())
         self.log(f"startup: collector, detector {self.detector_kind}, site {self.site.site_name}")
+        self.check_clock()
         for note in self.writer.recover(self.clock.now()):
             self.log(f"startup repair: {note}")
         next_second = next_minute = 0.0
         reason = "service stopped"
         while not self.stop_event.is_set():
             now = time.time()
-            wanted = self.schedule.window_at(now) is not None
+            wanted = self.schedule.window_at(now) is not None and self.clock_warning is None
             if wanted and not self.recording:
                 self.start_recording()
             elif not wanted and self.recording:
@@ -96,6 +98,17 @@ class Service:
         self.stop_recording(reason)
         self.log(f"shutdown: {reason}, files closed")
         self.writer.close()
+
+    def check_clock(self) -> None:
+        """Recording waits while the clock looks wrong: rows with wrong times would land in the wrong day
+        and hour files, and the schedule itself depends on the clock. A clock sync clears this."""
+        problem = clock_problem(time.time(), self.data_dir)
+        if problem and problem != self.clock_warning:
+            self.log(f"error: clock looks wrong ({problem}); not recording until a clock sync from a phone "
+                     "or laptop (web page, Clock sync)")
+        elif self.clock_warning and not problem:
+            self.log("clock looks right again; recording allowed")
+        self.clock_warning = problem
 
     def step(self) -> bool:
         """Process the newest frame of every camera that has one. False if none had one."""

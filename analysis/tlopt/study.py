@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field, replace
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +13,7 @@ import pandas as pd
 
 from tlopt import hcm, measures, optimize, quality, timing, validate
 from tlopt.intersection import Intersection
-from tlopt.load import Dataset, local_times
+from tlopt.load import DAY_NAMES, Dataset, local_times
 
 SCENARIOS = {"volumes +10%": ("v", 1.1), "volumes -10%": ("v", 0.9),
              "saturation flow +10%": ("s", 1.1), "saturation flow -10%": ("s", 0.9)}
@@ -20,10 +21,38 @@ SCENARIOS = {"volumes +10%": ("v", 1.1), "volumes -10%": ("v", 0.9),
 
 def prepare(ds: Dataset, inter: Intersection) -> pd.DataFrame:
     """Exclusions, per-vehicle delays and lane groups. Returns the exclusion counts."""
-    excluded = quality.mark_exclusions(ds, inter.options.daylight_only)
+    excluded = quality.mark_exclusions(ds, inter.options.daylight_only, inter.options.days,
+                                       inter.options.skip_dates)
+    skip = {str(d) for d in inter.options.skip_dates}
+    ds.study_days = [d for d in ds.days if d not in skip
+                     and DAY_NAMES[date.fromisoformat(d).weekday()] in inter.options.days]
     measures.add_vehicle_delays(ds)
     ds.vehicles["group"] = measures.group_of(ds.vehicles, measures.lane_groups(inter))
     return excluded
+
+
+MAX_DARK_SHARE = 0.25   # a period with more vehicles than this outside daylight is not studied
+
+
+def why_unusable(ds: Dataset, inter: Intersection, name: str) -> str | None:
+    """Why a period cannot be studied (with what to do about it), or None if it can."""
+    v = ds.vehicles
+    text = f"no usable data in period {name} ({inter.periods[name]})"
+    if not ds.used_days:
+        return (f"{text}: none of the days {', '.join(ds.days)} is a study day "
+                f"(options.days = {inter.options.days}, skip_dates = {inter.options.skip_dates})")
+    in_time = v[measures.period_mask(v["t_crossed_s"], ds.zone, inter, name) & v["day"].isin(ds.used_days)]
+    if not len(in_time):
+        hours = sorted(set(local_times(v["t_crossed_s"].dropna(), ds.zone).dt.strftime("%H:00")))
+        return f"{text}: the data has no vehicles at these times. Hours in the data: {', '.join(hours) or 'none'}"
+    dark = float((in_time["light"] != "day").mean())
+    if inter.options.daylight_only and dark > MAX_DARK_SHARE:
+        return (f"{text}: {100 * dark:.0f}% of its vehicles were in twilight or darkness, and daylight_only is "
+                "on. Move the period to a time with daylight, or check night accuracy on the Pi and set "
+                "options.daylight_only: false in intersection.yaml")
+    if not in_time["counted"].any():
+        return f"{text}: no usable vehicle crossed the stop line in it"
+    return None
 
 
 @dataclass
@@ -41,10 +70,12 @@ class Period:
 def measure(ds: Dataset, inter: Intersection, name: str) -> Period:
     v, zone = ds.vehicles, ds.zone
     served = v[measures.period_mask(v["t_crossed_s"], zone, inter, name) & v["counted"]]
-    arriving = v[measures.period_mask(v["t_entered_s"], zone, inter, name) & ~v["excluded_light"]]
-    signals = ds.signals[measures.period_mask(ds.signals["time_s"], zone, inter, name)]
-    if not len(served):
-        raise ValueError(f"no vehicles in period {name} ({inter.periods[name]})")
+    arriving = v[measures.period_mask(v["t_entered_s"], zone, inter, name) & ~v["excluded"]]
+    signals = ds.signals[measures.period_mask(ds.signals["time_s"], zone, inter, name)
+                         & ds.signals["day"].isin(ds.used_days)]
+    problem = why_unusable(ds, inter, name)
+    if problem:
+        raise ValueError(problem)
     start, end = inter.period_minutes(name)
     p = Period(name)
     groups = measures.lane_groups(inter)
@@ -69,7 +100,7 @@ def measure(ds: Dataset, inter: Intersection, name: str) -> Period:
     t["arrivals"] = measures.arrival_pattern(arriving, signals, greens, cycles, groups)
     yellow, all_red, min_green, _why = optimize.safety(inter)
     p.current = timing.current_plan(inter, p.timing, {q: (yellow[q], all_red[q]) for q in yellow})
-    p.groups = _group_inputs(arriving, zone, inter, groups, sat, t["arrivals"], ds.days)
+    p.groups = _group_inputs(arriving, zone, inter, groups, sat, t["arrivals"], ds.used_days)
     return p
 
 
@@ -99,7 +130,7 @@ def _group_inputs(arriving: pd.DataFrame, zone: str, inter: Intersection, groups
 def model(p: Period, ds: Dataset, inter: Intersection) -> None:
     """Model check against measured delays, then the current, Webster and optimized plans."""
     v = ds.vehicles
-    arriving = v[measures.period_mask(v["t_entered_s"], ds.zone, inter, p.name) & ~v["excluded_light"]]
+    arriving = v[measures.period_mask(v["t_entered_s"], ds.zone, inter, p.name) & ~v["excluded"]]
     current_greens = {q: spec[0] for q, spec in p.current["phases"].items()}
     table = validate.intervals(arriving, ds.zone, p.groups, current_greens, p.current["cycle_s"])
     p.tables["model_check"] = table

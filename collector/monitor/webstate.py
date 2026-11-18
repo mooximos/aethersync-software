@@ -65,6 +65,7 @@ class WebState:
         system = s.last_system
         return {
             "recording": s.recording,
+            "clock_warning": s.clock_warning or "",
             "next_window": format_epoch(upcoming, s.zone)[:16].replace("T", " ") if upcoming else "none",
             "battery_v": volts, "power_w": None if volts is None or amps is None else round(volts * amps, 1),
             "cpu_temp_c": system.get("cpu_temp_c", ""), "hailo_temp_c": system.get("hailo_temp_c", ""),
@@ -145,6 +146,7 @@ class WebState:
         s.writer.clock_sync_row(after, [format_epoch(before, s.zone), format_epoch(after, s.zone),
                                         f"{after - before:.1f}", source])
         change = s.clock.resync()
+        s.clock_warning = None   # a person just set the time from a trusted device
         s.log(f"clock synced from {source}: offset {after - before:+.1f} s; monotonic offset re-measured "
               f"({change:+.1f} s)" + (f"; problems: {'; '.join(problems)}" if problems else ""))
         return {"changed": True, "difference_s": round(difference, 2), "problems": problems}

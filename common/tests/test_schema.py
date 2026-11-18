@@ -146,6 +146,7 @@ def test_site_json_of_the_sample_loads():
     (("time_zone",), "Mars/Olympus", "time_zone"),
     (("event_codes",), {"82": "detector_on"}, "event_codes"),
     (("latitude",), 123.0, "latitude"),
+    (("longitude",), 122.0, "minus sign"),          # the sample site is at -121.87 in America/Los_Angeles
 ])
 def test_bad_site_values_name_the_bad_key(path, value, key_in_message):
     data = json.loads((DAY / "site.json").read_text())
@@ -156,6 +157,13 @@ def test_bad_site_values_name_the_bad_key(path, value, key_in_message):
     with pytest.raises(SiteError) as error:
         validate_site(data)
     assert key_in_message in str(error.value)
+
+
+def test_site_still_at_zero_zero_is_rejected():
+    data = json.loads((DAY / "site.json").read_text())
+    data["latitude"] = data["longitude"] = 0.0
+    with pytest.raises(SiteError, match="still 0.0, 0.0"):
+        validate_site(data)
 
 
 def test_site_with_misspelled_or_missing_key_is_rejected():
@@ -180,3 +188,12 @@ def test_missing_site_file_gives_a_clear_message(tmp_path):
     (tmp_path / "site.json").write_text("{not json")
     with pytest.raises(SiteError, match="not valid JSON"):
         load_site(tmp_path / "site.json")
+
+
+def test_windows_extract_all_nesting_is_handled(tmp_path):
+    outer = tmp_path / DAY.name
+    shutil.copytree(DAY, outer / DAY.name)     # data/D/D/files, as Windows "Extract All" makes it
+    assert readers.list_day_folders(tmp_path) == [outer / DAY.name]
+    assert readers.list_day_folders(outer) == [outer / DAY.name]
+    (tmp_path / "2026-05-13.zip").write_bytes(b"")
+    assert readers.zips_not_unzipped(tmp_path) == ["2026-05-13.zip"]

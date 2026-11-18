@@ -18,6 +18,7 @@ img.cam{width:100%;max-width:960px;display:block;margin-bottom:10px;background:#
 <main><h2>{{ title }}</h2>{{ body|safe }}</main></body></html>"""
 
 STATUS = """<p class="big" id="rec">...</p>
+<p class="big bad" id="clockwarn" hidden></p>
 <table id="tab"></table>
 <p><button onclick="awake()">Stay awake for 1 hour</button> <span id="awake"></span></p>
 <script>
@@ -26,6 +27,8 @@ async function load(){
  const s=await (await fetch('/api/status')).json();
  document.getElementById('rec').textContent=s.recording?'RECORDING':'Idle (not recording)';
  document.getElementById('rec').className='big '+(s.recording?'ok':'');
+ const cw=document.getElementById('clockwarn'); cw.hidden=!s.clock_warning;
+ cw.innerHTML=s.clock_warning?'NOT RECORDING: '+s.clock_warning+'. <a href="/clock">Sync the clock now</a>.':'';
  const phone=Date.now(), diff=(s.pi_time_ms-phone)/1000;
  let h=row('Next window',s.next_window)+row('Battery',s.battery_v===null?'-':s.battery_v.toFixed(2)+' V, '+s.power_w+' W')
  +row('CPU / Hailo temperature',s.cpu_temp_c+' C / '+s.hailo_temp_c+' C')
