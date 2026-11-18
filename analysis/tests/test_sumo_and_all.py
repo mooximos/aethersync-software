@@ -80,3 +80,31 @@ def test_all_on_sample_data(tmp_path):
     for heading in ("1. What was measured", "5. Does the model match reality?", "7. Predicted and simulated change"):
         assert heading in md
     assert (results / "measures" / "vehicle_delays.csv").exists()
+    _numbers_trace_back_to_raw_rows(results)
+
+
+def _numbers_trace_back_to_raw_rows(results):
+    """Report table -> vehicle_delays.csv -> the raw vehicles file, checked with plain csv reading."""
+    import csv
+    from common import readers
+    per_vehicle = pd.read_csv(results / "measures" / "vehicle_delays.csv", dtype={"lane": "Int64"})
+    raw = {}
+    for day in readers.list_day_folders(SAMPLE):
+        for _hour, path in readers.hour_files(day, "vehicles"):
+            name = f"{day.name}/{path.name}"
+            with readers.open_text(path) as f:
+                for row in csv.DictReader(f):
+                    raw[(name, row["vehicle_id"])] = row
+    for row in per_vehicle.itertuples():   # every vehicle in the results is a real row, unchanged
+        source = raw[(row.file, row.vehicle_id)]
+        assert source["t_crossed"] == ("" if pd.isna(row.t_crossed) else row.t_crossed)
+        assert float(source["wait_s"] or 0) == float(row.wait_s if pd.notna(row.wait_s) else 0)
+        assert source["approach"] == row.approach and source["turn"] == row.turn
+    assert len(per_vehicle) == len(raw)   # every raw row is in the results once: nothing added, nothing lost
+    table = pd.read_csv(results / "measures" / "am_delay_by_approach.csv").set_index("approach")
+    crossed = pd.to_datetime(per_vehicle["t_crossed"], format="%Y-%m-%dT%H:%M:%S.%f%z", utc=True)
+    local = crossed.dt.tz_convert("America/Los_Angeles")
+    used = per_vehicle[(local.dt.hour == 7) & per_vehicle["exclusion"].isna() & per_vehicle["control_delay_s"].notna()]
+    for approach, rows in used.groupby("approach"):   # the report's numbers, recomputed from the rows
+        assert table.loc[approach, "vehicles"] == len(rows)
+        assert abs(table.loc[approach, "mean_delay_s"] - rows["control_delay_s"].mean()) < 0.051

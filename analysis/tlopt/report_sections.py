@@ -101,7 +101,7 @@ def timing(doc, inter, periods, measures: Path, plans_dir: Path) -> None:
         notes = [n for n in table.get("note", pd.Series(dtype=str)).fillna("") if n]
         if notes:
             doc.p(f"Note: {notes[0]}")
-    current = json.loads((plans_dir / f"{periods[0]}_current.json").read_text())
+    current = json.loads((plans_dir / f"{periods[0]}_current.json").read_text(encoding="utf-8"))
     source = "the city's timing sheet" if inter.timing_sheet is not None else "the inferred timing"
     doc.p(f"The model uses {source} as the current plan.")
     if current["notes"]:
@@ -138,7 +138,7 @@ def model(doc, periods, plans_dir: Path, figs: Path) -> None:
           "and the current timing, for every 15 minutes of every day, and compared with the delay measured "
           "for the vehicles that arrived in those 15 minutes.")
     for period in periods:
-        check = json.loads((plans_dir / f"{period}_model_check.json").read_text())
+        check = json.loads((plans_dir / f"{period}_model_check.json").read_text(encoding="utf-8"))
         if not check.get("raw"):
             doc.p(f"{period}: not enough data to check the model.")
             continue
@@ -158,11 +158,11 @@ def plans(doc, inter, periods, plans_dir: Path, figs: Path) -> None:
     doc.h("6. The recommended plan")
     tod_path = plans_dir / "time_of_day.json"
     if tod_path.exists():
-        tod = json.loads(tod_path.read_text())
+        tod = json.loads(tod_path.read_text(encoding="utf-8"))
         doc.p(("Separate morning and evening plans are recommended: " if tod["separate"] else
                f"One plan for all periods is enough (the {tod.get('one_plan_from')} plan): ") + tod["reason"] + ".")
     for period in periods:
-        data = {label: json.loads((plans_dir / f"{period}_{label.lower()}.json").read_text())
+        data = {label: json.loads((plans_dir / f"{period}_{label.lower()}.json").read_text(encoding="utf-8"))
                 for label in ("Current", "Webster", "Optimized")}
         rows = []
         for phase, spec in data["Optimized"]["phases"].items():
@@ -190,7 +190,7 @@ def change(doc, periods, plans_dir: Path, sumo: Path, figs: Path) -> None:
     for period in periods:
         base = None
         for label in ("Current", "Webster", "Optimized"):
-            pred = json.loads((plans_dir / f"{period}_{label.lower()}.json").read_text())["predicted"]
+            pred = json.loads((plans_dir / f"{period}_{label.lower()}.json").read_text(encoding="utf-8"))["predicted"]
             base = base or pred["avg_delay_s"]
             rows.append({"period": period, "plan": label, "model delay (s/veh)": pred["avg_delay_s"],
                          "change vs current": f"{100 * (pred['avg_delay_s'] - base) / base:+.0f}%", "LOS": pred["LOS"],
@@ -200,7 +200,7 @@ def change(doc, periods, plans_dir: Path, sumo: Path, figs: Path) -> None:
     if summary is None:
         doc.p("The SUMO simulation has not been run yet (python -m tlopt simulate).")
         return
-    calibration = json.loads((sumo / "calibration.json").read_text())
+    calibration = json.loads((sumo / "calibration.json").read_text(encoding="utf-8"))
     doc.p(f"An independent traffic simulation (SUMO) ran each plan with the measured traffic, "
           f"{int(summary['seeds'].max())} times with different random arrivals (the same ones for every plan), after "
           f"a 15-minute warm-up. Drivers were calibrated to the measured saturation flow "

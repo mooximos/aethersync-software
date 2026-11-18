@@ -45,7 +45,7 @@ def simulate(inter: Intersection, results: Path, seeds: int = 10, log=print, pro
     started = time.time()
     out = results / "sumo"
     out.mkdir(parents=True, exist_ok=True)
-    studied = json.loads((results / "measures" / "summary.json").read_text())["periods"] \
+    studied = json.loads((results / "measures" / "summary.json").read_text(encoding="utf-8"))["periods"] \
         if (results / "measures" / "summary.json").exists() else inter.periods
     periods = [p for p in inter.periods if p in studied and (results / "plans" / f"{p}_optimized.json").exists()
                and (results / "measures" / f"{p}_sumo_demand.csv").exists()]
@@ -58,7 +58,7 @@ def simulate(inter: Intersection, results: Path, seeds: int = 10, log=print, pro
     try:
         net = sm.build_network(inter, folder)
         links = sm.signal_links(net)
-        plans = {(p, name): json.loads((results / "plans" / f"{p}_{name}.json").read_text())
+        plans = {(p, name): json.loads((results / "plans" / f"{p}_{name}.json").read_text(encoding="utf-8"))
                  for p in periods for name in PLANS}
         target, source = target_sat_flow(results, periods)
         log(f"SUMO: calibrating the driver model to {target:.0f} veh/h per through lane ({source})")

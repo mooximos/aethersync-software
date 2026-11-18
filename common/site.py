@@ -210,7 +210,7 @@ def validate_site(data: dict, source: str = "site.json") -> Site:
 def load_site(path: Path) -> Site:
     path = Path(path)
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        with open(path, "r", encoding="utf-8-sig") as handle:
             data = json.load(handle)
     except FileNotFoundError:
         raise SiteError(f"{path} does not exist") from None

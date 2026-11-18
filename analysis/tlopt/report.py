@@ -100,7 +100,7 @@ def build(inter: Intersection, results: Path) -> tuple[Path, Path]:
     measures, plans_dir, sumo = results / "measures", results / "plans", results / "sumo"
     figs = results / "figures"
     figs.mkdir(parents=True, exist_ok=True)
-    summary = json.loads((measures / "summary.json").read_text())
+    summary = json.loads((measures / "summary.json").read_text(encoding="utf-8"))
     periods = list(summary["periods"])
     doc = Doc(figs)
     doc.h(f"Signal timing study: {summary['intersection']}", 1)

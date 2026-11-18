@@ -127,7 +127,7 @@ def load(data_dirs: list[Path], with_tracks: bool = True) -> Dataset:
     sites, syncs = {}, []
     for day_dir in day_dirs:
         try:
-            sites[day_dir.name] = validate_site(json.loads((day_dir / "site.json").read_text()), str(day_dir / "site.json")).model_dump(mode="json")
+            sites[day_dir.name] = validate_site(json.loads((day_dir / "site.json").read_text(encoding="utf-8")), str(day_dir / "site.json")).model_dump(mode="json")
         except (OSError, json.JSONDecodeError, SiteError) as error:
             problems.append(f"{day_dir.name}: skipped the whole day, site.json problem: {error}")
             continue

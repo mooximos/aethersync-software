@@ -131,7 +131,7 @@ class Intersection(Strict):
 def load_intersection(path: Path) -> Intersection:
     path = Path(path)
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = yaml.safe_load(path.read_text(encoding="utf-8-sig"))
     except FileNotFoundError:
         raise IntersectionError(f"{path} does not exist") from None
     except yaml.YAMLError as error:

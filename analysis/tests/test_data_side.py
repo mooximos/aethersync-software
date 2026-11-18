@@ -247,3 +247,10 @@ def test_damaged_files_are_reported_and_the_rest_is_used(tmp_path):
     assert ds.tracks["file"].astype(str).str.contains("tracks_07").all()
     assert len(ds.vehicles) == sum(1 for _ in open(SAMPLE / "2026-05-12" / "vehicles_07.csv")) - 1 + \
         sum(1 for _ in open(SAMPLE / "2026-05-12" / "vehicles_17.csv")) - 1
+
+
+def test_intersection_yaml_saved_by_windows_notepad_loads(tmp_path):
+    path = tmp_path / "intersection.yaml"
+    text = EXAMPLE.read_text(encoding="utf-8").replace("\n", "\r\n")
+    path.write_bytes("﻿".encode("utf-8") + text.encode("utf-8"))      # BOM + CRLF
+    assert load_intersection(path).name == load_intersection(EXAMPLE).name

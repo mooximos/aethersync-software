@@ -56,6 +56,10 @@ days in a row (weekends included, a dark evening hour) and running `tlopt all` o
   allowed Webster plan), a dead camera, damaged files, and the real collector main loop with fake
   cameras (records a car, closes files, no power-off, and no image file anywhere on disk while
   the live view is open).
+- Traceability test: every row of `vehicle_delays.csv` is checked against its raw vehicles file
+  (same crossing time, wait, approach and turn; no row added or lost), and the report's per-approach
+  vehicle counts and mean delays are recomputed from those rows.
+- Files edited with Windows Notepad (byte-order mark, CRLF) load: intersection.yaml and site.json.
 - Not a bug, but worth knowing: when Webster's plan breaks the X <= 0.92 limit, the optimized plan
   can have a little more delay than Webster's, because it keeps the limit.
 
