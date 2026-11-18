@@ -10,7 +10,19 @@ records where the build stands and the decisions made so far.
 | 1 | `common/`, `tools/make_sample_data.py`, `sample_data/` | **done** |
 | 2 | `collector/` (with replay mode and `check_hardware.py`) | **done**, 161 tests pass in total (`python -m pytest`) |
 | 3 | `analysis/` (with SUMO and the report) | **done**, 201 tests pass in total |
-| 4 | `README.md` (student guide), `docs/DATA_FORMAT.md` | not started (README is a placeholder) |
+| 4 | `README.md` (student guide), `docs/DATA_FORMAT.md` | **done** |
+
+## Defaults chosen in stage 4 (docs)
+
+- `requirements-analysis.txt` ends with `-e .`, which installs this project itself, so
+  `python -m tlopt` and `python -m monitor` work from any folder without setting PYTHONPATH
+  (awkward on Windows). `install.sh` does the same on the Pi.
+- `python -m tlopt check` no longer needs `intersection.yaml` (the weekly data check comes before
+  the students write it).
+- On a laptop without the collector's packages, `python -m pytest` skips the collector tests and
+  prints a note saying so, instead of failing.
+- The README tells students to get calibration distances from plans, online maps or standard
+  lane markings, never by walking into the road.
 
 ## Defaults chosen in stage 1
 

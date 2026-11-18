@@ -21,6 +21,7 @@ if [ ! -x "$REPO/.venv/bin/python" ]; then
   python3 -m venv --system-site-packages "$REPO/.venv"
 fi
 "$REPO/.venv/bin/pip" install --quiet -r "$REPO/requirements-collector.txt"
+"$REPO/.venv/bin/pip" install --quiet --no-deps -e "$REPO"   # so `python -m monitor` works from any folder
 
 echo "== 3/7 I2C (for the INA226 battery sensor)"
 sudo raspi-config nonint do_i2c 0

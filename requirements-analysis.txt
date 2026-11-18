@@ -2,6 +2,7 @@
 #   pip install -r requirements-analysis.txt
 # Runs the sample data generator, the analysis (python -m tlopt) and the tests.
 # SUMO comes from pip (eclipse-sumo); SUMO_HOME does not need to be set.
+# The last line installs this project itself, so `python -m tlopt` works from any folder.
 numpy==2.5.3; python_version >= "3.12"
 numpy==2.4.6; python_version < "3.12"     # the last numpy for Python 3.11
 scipy==1.18.1; python_version >= "3.12"
@@ -14,3 +15,4 @@ eclipse-sumo==1.28.0
 sumolib==1.28.0
 traci==1.28.0
 pytest==9.2.0
+-e .

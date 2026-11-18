@@ -128,10 +128,12 @@ def main(argv: list[str] | None = None) -> None:
     for name in ("simulate", "report"):
         sub.add_parser(name, parents=[common])
     args = parser.parse_args(argv)
-    try:
-        inter = load_intersection(find_intersection(args.intersection))
-    except IntersectionError as error:
-        raise SystemExit(f"Cannot start: {error}")
+    inter = None
+    if args.command != "check":   # the data check needs no intersection.yaml
+        try:
+            inter = load_intersection(find_intersection(args.intersection))
+        except IntersectionError as error:
+            raise SystemExit(f"Cannot start: {error}")
     args.results.mkdir(parents=True, exist_ok=True)
     steps = {"check": [cmd_check], "measure": [cmd_measure], "optimize": [cmd_optimize],
              "simulate": [cmd_simulate], "report": [cmd_report],
